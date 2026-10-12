@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(FILLIN_PROJECT_NAME LANGUAGES CXX)
+project(CGOL+ LANGUAGES CXX)
 
 # version
 set(PROJECT_VERSION "0.1.0")
@@ -11,8 +11,8 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-set_property(DIRECTORY PROPERTY DESCRIPTION "FILLIN_PROJECT_DESCRIPTION")
-set_property(DIRECTORY PROPERTY HOMEPAGE_URL "FILLIN_REPO_LINK")
+set_property(DIRECTORY PROPERTY DESCRIPTION "CGOL+")
+set_property(DIRECTORY PROPERTY HOMEPAGE_URL "https://github.com/ZaineRehman/CGOL-plus")
 
 
 # set output directory for build objects
@@ -21,7 +21,7 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/bin/$<CONFIGURAT
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/bin/$<CONFIGURATION>")
 
 # sources
-add_executable(FILLIN_PROJECT_EXEC_NAME 
+add_executable(CGOLplus 
 	${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp
 )
 
@@ -30,30 +30,30 @@ add_executable(FILLIN_PROJECT_EXEC_NAME
 set(SDL3_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/SDL3)
 
 # headers
-target_include_directories(FILLIN_PROJECT_EXEC_NAME PRIVATE 
+target_include_directories(CGOLplus PRIVATE 
 	${CMAKE_CURRENT_SOURCE_DIR}/include
 	${SDL3_DIR}/include
 )
 
 # target lib for linking
-target_link_directories(FILLIN_PROJECT_EXEC_NAME PRIVATE ${SDL3_DIR}/lib)
-target_link_libraries(FILLIN_PROJECT_EXEC_NAME PRIVATE SDL3)
+target_link_directories(CGOLplus PRIVATE ${SDL3_DIR}/lib)
+target_link_libraries(CGOLplus PRIVATE SDL3)
 
 # copy SDL3 dll to build output dir
-add_custom_command(TARGET FILLIN_PROJECT_EXEC_NAME POST_BUILD
+add_custom_command(TARGET CGOLplus POST_BUILD
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 	${SDL3_DIR}/bin/SDL3.dll
-	$<TARGET_FILE_DIR:FILLIN_PROJECT_EXEC_NAME>
+	$<TARGET_FILE_DIR:CGOLplus>
 	COMMENT "Copying SDL3.dll to target output directory..."
 )
 
 
 # packaging
 
-set(CPACK_PACKAGE_NAME "FILLIN_PROJECT_PACKAGE_NAME")
+set(CPACK_PACKAGE_NAME "CGOL+")
 set(CPACK_PACKAGE_VENDOR "Zaine Rehman")
 set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
-set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "FILLIN_PROJECT_SUMMARY")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "CGOL+")
 
 if(WIN32)
 	set(CPACK_GENERATOR ZIP)

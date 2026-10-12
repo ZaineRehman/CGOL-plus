@@ -15,16 +15,16 @@ all: debug
 run: run_d
 run_d: 
 #ifeq ($(OS), Windows_NT)
-	./bin/Debug/FILLIN_EXEC_NAME
+	./bin/Debug/CGOLplus
 #else
-#	sudo ./bin/Debug/FILLIN_EXEC_NAME
+#	sudo ./bin/Debug/CGOLplus
 #endif
 
 run_r: 
 #ifeq ($(OS), Windows_NT)
-	./bin/Release/FILLIN_EXEC_NAME
+	./bin/Release/CGOLplus
 #else
-#	sudo ./bin/Release/FILLIN_EXEC_NAME
+#	sudo ./bin/Release/CGOLplus
 #endif
 
 
