@@ -10,6 +10,7 @@ struct Point {
 
 	Point() = default;
 	Point(int _x, int _y) : x(_x), y(_y) {}
+	Point(size_t _x, size_t _y) : x(static_cast<int>(_x)), y(static_cast<int>(_y)) {}
 	Point(const Point& other) = default;
 
 	bool operator==(const Point& other) const {
@@ -43,6 +44,7 @@ public:
 
 	Cell() = default;
 	Cell(int _state) : state(_state) {}
+	Cell(size_t _state) : state(static_cast<int>(_state)) {}
 	//Cell(int _state/**/, const Point& _point) : state(_state), coords(_point) {}
 	Cell(const Cell& other) = default;
 };
