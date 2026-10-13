@@ -29,9 +29,12 @@ int main() {
 
 	Renderer renderer {WIDTH, HEIGHT, "CGOL+"};
 
+	size_t cellsWidth = WIDTH/pixelsPerCell;
+	size_t cellsHeight = HEIGHT/pixelsPerCell;
+
 	//std::unordered_map<Point, Cell> cellMap, newMap {};
-	std::vector<Cell> cellMap((WIDTH/pixelsPerCell)*(HEIGHT/pixelsPerCell), Cell{0}), 
-					  newMap ((WIDTH/pixelsPerCell)*(HEIGHT/pixelsPerCell), Cell{0});
+	std::vector<Cell> cellMap(cellsWidth*cellsHeight, Cell{0}), 
+					  newMap (cellsWidth*cellsHeight, Cell{0});
 
 	std::vector<Rules> rules {
 		Rules{-1, -1, -1, {1, 0, 1}}, 
@@ -69,9 +72,9 @@ int main() {
 
 
 	// fill with random
-	for (size_t x = 0; x < WIDTH/pixelsPerCell; ++x) {
-		for (size_t y = 0; y < HEIGHT/pixelsPerCell; ++y) {
-			cellMap[y*WIDTH/pixelsPerCell + x] = Cell{rand() % 2};
+	for (size_t x = 0; x < cellsWidth; ++x) {
+		for (size_t y = 0; y < cellsHeight; ++y) {
+			cellMap[y*cellsWidth + x] = Cell{rand() % 2};
 		}
 	}
 	
@@ -152,6 +155,51 @@ int main() {
 					case SDLK_SPACE: 
 						paused = !paused;
 						break;
+					
+					case SDLK_LEFTBRACKET:  // halve FPS
+						FPS /= 2.0;
+						break;
+					case SDLK_RIGHTBRACKET:  // double FPS
+						FPS *= 2.0;
+						break;
+					
+					case SDLK_RETURN: 
+						// fill with random
+						for (size_t x = 0; x < cellsWidth; ++x) {
+							for (size_t y = 0; y < cellsHeight; ++y) {
+								cellMap[y*cellsWidth + x] = Cell{rand() % 2};
+							}
+						}
+						break;
+					
+					case SDLK_COMMA:  // decrement cell pixel size
+						clamp(--pixelsPerCell, (size_t)1, (size_t)16);
+						cellsWidth = WIDTH/pixelsPerCell;
+						cellsHeight = HEIGHT/pixelsPerCell;
+
+						cellMap.clear();
+						cellMap.resize(cellsWidth*cellsHeight);
+						cellMap.assign(cellsWidth*cellsHeight, Cell{0});
+						
+						newMap.clear();
+						newMap.resize(cellsWidth*cellsHeight);
+						newMap.assign(cellsWidth*cellsHeight, Cell{0});
+
+						break;
+					case SDLK_PERIOD:  // increment cell pixel size
+						clamp(++pixelsPerCell, (size_t)1, (size_t)16);
+						cellsWidth = WIDTH/pixelsPerCell;
+						cellsHeight = HEIGHT/pixelsPerCell;
+
+						cellMap.clear();
+						cellMap.resize(cellsWidth*cellsHeight);
+						cellMap.assign(cellsWidth*cellsHeight, Cell{0});
+
+						newMap.clear();
+						newMap.resize(cellsWidth*cellsHeight);
+						newMap.assign(cellsWidth*cellsHeight, Cell{0});
+
+						break;
 				}
 			}
 		}
@@ -176,60 +224,57 @@ int main() {
 			presentRules = true;
 		}
 
-		//cellMap ((WIDTH/pixelsPerCell)*(HEIGHT/pixelsPerCell), Cell{0});
-		//newMap ((WIDTH/pixelsPerCell)*(HEIGHT/pixelsPerCell), Cell{0});
-
-		size_t cellsWidth = WIDTH/pixelsPerCell, cellsHeight = HEIGHT/pixelsPerCell;
-
 
 		// TODO optimize checks
 
-		for (size_t y = 0; y < cellsHeight; ++y) {
-			for (size_t x = 0; x < cellsWidth; ++x) {
-				newMap[y*cellsWidth + x] = cellMap[y*cellsWidth + x];
-				Point point {x, y};
+		if (!paused) {
+			for (size_t y = 0; y < cellsHeight; ++y) {
+				for (size_t x = 0; x < cellsWidth; ++x) {
+					newMap[y*cellsWidth + x] = cellMap[y*cellsWidth + x];
+					Point point {x, y};
 
-				// check if cell
-				Cell c = cellMap[y*cellsWidth + x];
-				if (c.state != 0) {
-					const Rules& local = rules[c.state];
-					// get surrounding cell outcome
-					int outcome = getSurrounding(point, cellMap, local.surrounding, cellsWidth, cellsHeight);
+					// check if cell
+					Cell c = cellMap[y*cellsWidth + x];
+					if (c.state != 0) {
+						const Rules& local = rules[c.state];
+						// get surrounding cell outcome
+						int outcome = getSurrounding(point, cellMap, local.surrounding, cellsWidth, cellsHeight);
 
-					if (outcome < local.minToSurvive) {
-						// lower state
-						newMap[y*cellsWidth + x].state--;
-					} else if (outcome >= local.minToDie) {
-						// raise state
-						newMap[y*cellsWidth + x].state++;
-						// state too big? kill it
-						if (newMap[y*cellsWidth + x].state == rules.size()) {
-							newMap[y*cellsWidth + x].state = 0;
+						if (outcome < local.minToSurvive) {
+							// lower state
+							newMap[y*cellsWidth + x].state--;
+						} else if (outcome >= local.minToDie) {
+							// raise state
+							newMap[y*cellsWidth + x].state++;
+							// state too big? kill it
+							if (newMap[y*cellsWidth + x].state == rules.size()) {
+								newMap[y*cellsWidth + x].state = 0;
+							}
+						}
+					} else {
+						// no cell, check if life
+						int outcome = getSurrounding(point, cellMap, rules[0].surrounding, cellsWidth, cellsHeight);
+
+						// cells regenerate preferring higher states
+						for (size_t r = 1; r < rules.size(); ++r) {
+							if (outcome == rules[r].numForReproduction) {
+								// alive!
+								newMap[y*cellsWidth + x] = Cell{r};
+							}
 						}
 					}
-				} else {
-					// no cell, check if life
-					int outcome = getSurrounding(point, cellMap, rules[0].surrounding, cellsWidth, cellsHeight);
 
-					// cells regenerate preferring higher states
-					for (size_t r = 1; r < rules.size(); ++r) {
-						if (outcome == rules[r].numForReproduction) {
-							// alive!
-							newMap[y*cellsWidth + x] = Cell{r};
+					// calculate render
+					for (size_t py = 0; py < pixelsPerCell; ++py) {
+						for (size_t px = 0; px < pixelsPerCell; ++px) {
+							screen[(pixelsPerCell*point.y+py)*WIDTH + (pixelsPerCell*point.x+px)] = stateColors[newMap[y*cellsWidth + x].state];
 						}
-					}
-				}
-
-				// calculate render
-				for (size_t py = 0; py < pixelsPerCell; ++py) {
-					for (size_t px = 0; px < pixelsPerCell; ++px) {
-						screen[(pixelsPerCell*point.y+py)*WIDTH + (pixelsPerCell*point.x+px)] = stateColors[newMap[y*cellsWidth + x].state];
 					}
 				}
 			}
-		}
 
-		cellMap.swap(newMap);
+			cellMap.swap(newMap);
+		}
 
 		renderer.render(screen);
 
