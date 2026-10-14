@@ -17,8 +17,10 @@
 size_t WIDTH = 800, HEIGHT = 800;
 double FPS = 60.0;
 
+size_t numThreads = 16;
+
 // length/width of square for each cell
-size_t pixelsPerCell = 4;
+size_t pixelsPerCell = 3;
 
 
 int main() {
@@ -37,10 +39,10 @@ int main() {
 					  newMap (cellsWidth*cellsHeight, Cell{0});
 
 	std::vector<Rules> rules {
-		Rules{-1, -1, -1, {1, 0, 1}}, 
-		Rules{ 2,  3, -1, {1, 1, 2}}, 
-		Rules{ 2,  5,  4, {1, 0, 1}}, 
-		//Rules{ 2,  4,  3, {1, 1, 1}},  // STANDARD
+		Rules{-1, -1, -1, -1, {0, 0, 1}}, 
+		Rules{ 2,  3, -1, -1, {0, 1, 2}}, 
+		Rules{ 2,  5,  4,  4, {0, 0, 1}}, 
+		//Rules{ 2,  4,  3, 3, {1, 1, 1}},  // STANDARD
 	};
 	std::vector<RGBA_t> stateColors {
 		RGBA_t{  0,   0,   0, 255}, 
@@ -48,8 +50,11 @@ int main() {
 		RGBA_t{255, 255, 255, 255}, 
 	};
 
-	// paused?
 	bool paused = false;
+
+	// delay for cell calc per frame
+	int frameDelay = 0;
+	int maxFrameDelay = 0;
 
 	// show rules to terminal?
 	bool presentRules = true;
@@ -57,12 +62,14 @@ int main() {
 	int edit_stateIndex = 0;
 	// which specific rule
 	int edit_ruleIndex = 0;
-	// if editing surrounding rules, which index
-	int edit_surroundingIndex = -1;
 
-	std::string ansi_reset = "\033[0m";
-	std::string ansi_active = "\033[1;38:5:46m";
-	std::string ansi_inactive = "\033[1m";
+	std::string 
+		ansi_reset = "\033[0m", 
+		ansi_red = "\033[91m", 
+		ansi_blue = "\033[94m", 
+		ansi_green = "\033[92m", 
+		ansi_active = "\033[1;38:5:46m", 
+		ansi_inactive = "\033[1m";
 
 	// get color for parameters when outputting
 	auto getPresentColor = [&](int stateIndex, int ruleIndex) {
@@ -85,17 +92,25 @@ int main() {
 		if (presentRules) {
 			system("cls");
 
+			// output rules
 			for (size_t ri = 0; ri < rules.size(); ++ri) {
-				std::cout << "State " << ri << ": ";
-				std::cout << getPresentColor(ri, 0) << padString(rules[ri].minToSurvive, 2) << ansi_reset << ",";
-				std::cout << getPresentColor(ri, 1) << padString(rules[ri].minToDie, 2) << ansi_reset << ",";
-				std::cout << getPresentColor(ri, 2) << padString(rules[ri].numForReproduction, 2) << ansi_reset << " {";
+				std::cout 
+					<< "State " << ri << ": "
+					<< getPresentColor(ri, 0) << padString(rules[ri].minToSurvive, 2) << ansi_reset << ","
+					<< getPresentColor(ri, 1) << padString(rules[ri].minToDie, 2) << ansi_reset << " ~ "
+					<< getPresentColor(ri, 2) << padString(rules[ri].minForReproduction, 2) << ansi_reset << ","
+					<< getPresentColor(ri, 3) << padString(rules[ri].maxForReproduction, 2) << ansi_reset << " {";
 				for (size_t si = 0; si < rules[ri].surrounding.size(); ++si) {
 					std::cout 
-					<< getPresentColor(ri, 3 + si) 
-					<< padString(rules[ri].surrounding[si], 2) 
-					<< ansi_reset << (si == rules[ri].surrounding.size()-1 ? "}\n": ",");
+						<< getPresentColor(ri, 4 + si) 
+						<< padString(rules[ri].surrounding[si], 2) 
+						<< ansi_reset << (si == rules[ri].surrounding.size()-1 ? "}  [": ",");
 				}
+				// color
+				std::cout 
+					<< ansi_red   << padString(stateColors[ri].r, 3) << ansi_reset << " "
+					<< ansi_green << padString(stateColors[ri].g, 3) << ansi_reset << " "
+					<< ansi_blue  << padString(stateColors[ri].b, 3) << ansi_reset << "]\n";
 			}
 
 			/* TODO look into why this crashes
@@ -118,12 +133,22 @@ int main() {
 		SDL_Event event;
 		// desire to change indexed rule
 		int edit_desire = 0;
+		// mouse position
+		//float mouseX, mouseY;
+
 		while (SDL_PollEvent(&event)) {
 			if (event.type == SDL_EVENT_QUIT) {
 				RUNNING = false;
 			}
 			else if (event.type == SDL_EVENT_KEY_DOWN) {
 				switch (event.key.key) {
+					//case SDL_EVENT_MOUSE_BUTTON_DOWN:  // place cell
+					//	SDL_GetMouseState(&mouseX, &mouseY);
+					//	if (mouseX >= 0 && mouseX < WIDTH && mouseY >= 0 && mouseY < HEIGHT) {
+					//		
+					//	}
+					//	break;
+
 					case SDLK_ESCAPE: 
 						RUNNING = false;
 						break;
@@ -137,37 +162,63 @@ int main() {
 						presentRules = true;
 						break;
 					case SDLK_LEFT: 
-						clamp_rollover(--edit_ruleIndex, 0, static_cast<int>(2*rules.size()-1));
+						clamp_rollover(--edit_ruleIndex, 0, static_cast<int>(rules.size()+3));
 						presentRules = true;
 						break;
 					case SDLK_RIGHT: 
-						clamp_rollover(++edit_ruleIndex, 0, static_cast<int>(2*rules.size()-1));
+						clamp_rollover(++edit_ruleIndex, 0, static_cast<int>(rules.size()+3));
 						presentRules = true;
 						break;
 					
-					case SDLK_MINUS: 
+					case SDLK_MINUS:  // decrement rule value
 						edit_desire = -1;
 						break;
-					case SDLK_EQUALS: 
+					case SDLK_EQUALS:  // increment rule value
 						edit_desire = 1;
 						break;
 					
-					case SDLK_SPACE: 
+					case SDLK_Q:  // increase red
+						stateColors[edit_stateIndex].r = static_cast<uint8_t>(min((int)stateColors[edit_stateIndex].r + 16, 255));
+						presentRules = true;
+						break;
+					case SDLK_W:  // increase green
+						stateColors[edit_stateIndex].g = static_cast<uint8_t>(min((int)stateColors[edit_stateIndex].g + 16, 255));
+						presentRules = true;
+						break;
+					case SDLK_E:  // increase blue
+						stateColors[edit_stateIndex].b = static_cast<uint8_t>(min((int)stateColors[edit_stateIndex].b + 16, 255));
+						presentRules = true;
+						break;
+					case SDLK_A:  // decrease red
+						stateColors[edit_stateIndex].r = static_cast<uint8_t>(max((int)stateColors[edit_stateIndex].r - 16, 0));
+						presentRules = true;
+						break;
+					case SDLK_S:  // decrease green
+						stateColors[edit_stateIndex].g = static_cast<uint8_t>(max((int)stateColors[edit_stateIndex].g - 16, 0));
+						presentRules = true;
+						break;
+					case SDLK_D:  // decrease blue
+						stateColors[edit_stateIndex].b = static_cast<uint8_t>(max((int)stateColors[edit_stateIndex].b - 16, 0));
+						presentRules = true;
+						break;
+					
+					case SDLK_SPACE:  // pause
 						paused = !paused;
 						break;
 					
-					case SDLK_LEFTBRACKET:  // halve FPS
-						FPS /= 2.0;
+					case SDLK_LEFTBRACKET:  // decrease frame delay
+						maxFrameDelay -= 2;
+						clamp(maxFrameDelay, 0, 256);
 						break;
-					case SDLK_RIGHTBRACKET:  // double FPS
-						FPS *= 2.0;
+					case SDLK_RIGHTBRACKET:  // increase frame delay
+						maxFrameDelay += 2;
+						clamp(maxFrameDelay, 0, 256);
 						break;
 					
-					case SDLK_RETURN: 
-						// fill with random
+					case SDLK_SLASH:  // fill with random
 						for (size_t x = 0; x < cellsWidth; ++x) {
 							for (size_t y = 0; y < cellsHeight; ++y) {
-								cellMap[y*cellsWidth + x] = Cell{rand() % 2};
+								cellMap[y*cellsWidth + x] = Cell{rand() % rules.size()};
 							}
 						}
 						break;
@@ -180,7 +231,7 @@ int main() {
 						cellMap.clear();
 						cellMap.resize(cellsWidth*cellsHeight);
 						cellMap.assign(cellsWidth*cellsHeight, Cell{0});
-						
+
 						newMap.clear();
 						newMap.resize(cellsWidth*cellsHeight);
 						newMap.assign(cellsWidth*cellsHeight, Cell{0});
@@ -200,25 +251,62 @@ int main() {
 						newMap.assign(cellsWidth*cellsHeight, Cell{0});
 
 						break;
+					
+					case SDLK_BACKSPACE:  // delete topmost state
+						if (rules.size() != 1) {
+							rules.pop_back();
+							stateColors.pop_back();
+
+							// remove reference from surrounding
+							for (Rules& rule : rules) {
+								rule.surrounding.pop_back();
+							}
+
+							// destroy all of those cells
+							for (Cell& cell : cellMap) {
+								if (cell.state == rules.size()) cell.state = 0;
+							}
+
+							presentRules = true;
+						}
+
+						break;
+					
+					case SDLK_RETURN:  // add topmost state
+						Rules defaultRuleset {2, 4, 3, 3, {0}};
+						LOOP(rules.size()-1) defaultRuleset.surrounding.push_back(1);
+
+						rules.push_back(defaultRuleset);
+						stateColors.push_back(RGBA_t{255,255,255,255});
+
+						// add surrounding rules to each state
+						for (Rules& rule : rules) {
+							rule.surrounding.push_back(1);
+						}
+
+						presentRules = true;
+						break;
 				}
 			}
 		}
 
 		// edit rules
 		if (edit_desire != 0) {
-			if (edit_ruleIndex == 0) {
+			if (edit_ruleIndex == 0) {  // minToSurvive
 				rules[edit_stateIndex].minToSurvive += edit_desire;
 				clamp(rules[edit_stateIndex].minToSurvive, -1, 8);
-			} else if (edit_ruleIndex == 1) {
+			} else if (edit_ruleIndex == 1) {  // minToDie
 				rules[edit_stateIndex].minToDie += edit_desire;
 				clamp(rules[edit_stateIndex].minToDie, -1, 8);
-			} else if (edit_ruleIndex == 2) {
-				rules[edit_stateIndex].numForReproduction += edit_desire;
-				clamp(rules[edit_stateIndex].numForReproduction, -1, 8);
-			} else {
-				// editing surrounding rules
-				rules[edit_stateIndex].surrounding[edit_ruleIndex-3] += edit_desire;
-				clamp(rules[edit_stateIndex].surrounding[edit_ruleIndex-3], -1, 8);
+			} else if (edit_ruleIndex == 2) {  // minForReproduction
+				rules[edit_stateIndex].minForReproduction += edit_desire;
+				clamp(rules[edit_stateIndex].minForReproduction, -1, 8);
+			} else if (edit_ruleIndex == 3) {  // maxForReproduction
+				rules[edit_stateIndex].maxForReproduction += edit_desire;
+				clamp(rules[edit_stateIndex].maxForReproduction, -1, 8);
+			} else {  // surrounding rules
+				rules[edit_stateIndex].surrounding[edit_ruleIndex-4] += edit_desire;
+				clamp(rules[edit_stateIndex].surrounding[edit_ruleIndex-4], -1, 8);
 			}
 
 			presentRules = true;
@@ -227,56 +315,31 @@ int main() {
 
 		// TODO optimize checks
 
-		if (!paused) {
-			for (size_t y = 0; y < cellsHeight; ++y) {
-				for (size_t x = 0; x < cellsWidth; ++x) {
-					newMap[y*cellsWidth + x] = cellMap[y*cellsWidth + x];
-					Point point {x, y};
+		if (frameDelay == 0 && !paused) {
+			std::vector<std::thread> threads {};
 
-					// check if cell
-					Cell c = cellMap[y*cellsWidth + x];
-					if (c.state != 0) {
-						const Rules& local = rules[c.state];
-						// get surrounding cell outcome
-						int outcome = getSurrounding(point, cellMap, local.surrounding, cellsWidth, cellsHeight);
+			// chunks are vertical slices
+			int xChunkSize = cellsWidth / numThreads;
+			int overflow = cellsWidth % numThreads;
 
-						if (outcome < local.minToSurvive) {
-							// lower state
-							newMap[y*cellsWidth + x].state--;
-						} else if (outcome >= local.minToDie) {
-							// raise state
-							newMap[y*cellsWidth + x].state++;
-							// state too big? kill it
-							if (newMap[y*cellsWidth + x].state == rules.size()) {
-								newMap[y*cellsWidth + x].state = 0;
-							}
-						}
-					} else {
-						// no cell, check if life
-						int outcome = getSurrounding(point, cellMap, rules[0].surrounding, cellsWidth, cellsHeight);
-
-						// cells regenerate preferring higher states
-						for (size_t r = 1; r < rules.size(); ++r) {
-							if (outcome == rules[r].numForReproduction) {
-								// alive!
-								newMap[y*cellsWidth + x] = Cell{r};
-							}
-						}
-					}
-
-					// calculate render
-					for (size_t py = 0; py < pixelsPerCell; ++py) {
-						for (size_t px = 0; px < pixelsPerCell; ++px) {
-							screen[(pixelsPerCell*point.y+py)*WIDTH + (pixelsPerCell*point.x+px)] = stateColors[newMap[y*cellsWidth + x].state];
-						}
-					}
-				}
+			for (size_t t = 0; t < numThreads; ++t) {
+				threads.push_back(std::thread(doCellCalc, 
+					0, cellsHeight, 
+					xChunkSize*t, xChunkSize*(t+1) + (t == numThreads-1 ? overflow : 0), 
+					cellsHeight, cellsWidth, cellMap, std::ref(newMap), rules, stateColors, std::ref(screen), 
+					pixelsPerCell, WIDTH, HEIGHT
+				));
 			}
+
+			for (std::thread& t : threads) t.join();
 
 			cellMap.swap(newMap);
 		}
 
 		renderer.render(screen);
+
+		frameDelay--;
+		if (frameDelay < 0) frameDelay = maxFrameDelay;
 
 		// deltatime
 

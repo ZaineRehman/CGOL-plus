@@ -56,11 +56,18 @@ struct Rules {
 	int minToSurvive;
 	// minimum surrounding for overpopulation death
 	int minToDie;
-	// amount of surrounding for reproduction
-	int numForReproduction;
+	// min amount of surrounding for reproduction
+	int minForReproduction;
+	// max amount of surrounding for reproduction
+	int maxForReproduction;
 	// surrounding values taken from each cell state
 	// index 0 = for empty cells, index 1 = state 1, etc. 
 	std::vector<int> surrounding;
+
+	Rules() = default;
+	Rules(int _minToSurvive, int _minToDie, int _minForReproduction, int _maxForReproduction, const std::vector<int>& _surrounding) 
+		: minToSurvive(_minToSurvive), minToDie(_minToDie), minForReproduction(_minForReproduction), maxForReproduction(_maxForReproduction), surrounding(_surrounding) {}
+	Rules(const Rules& other) = default;
 };
 
 // returns the number of surrounding cells
@@ -79,11 +86,66 @@ int getSurrounding(const Point& point, const std::vector<Cell>& cells, const std
 
 		if (newX >= 0 && newX < static_cast<int>(WIDTH) && newY >= 0 && newY < static_cast<int>(HEIGHT)) {
 			int cstate = cells[newY*static_cast<int>(WIDTH) + newX].state;
-			if (cstate != 0) {
-				total += surroundingRules[cstate];
-			}
+			total += surroundingRules[cstate];
 		}
 	}
 
 	return total;
+}
+
+
+// cell calculation
+void doCellCalc(
+	size_t yStart, size_t yEnd, 
+	size_t xStart, size_t xEnd, 
+	size_t cellsHeight, size_t cellsWidth, 
+	const std::vector<Cell>& cellMap, std::vector<Cell>& newMap, 
+	const std::vector<Rules>& rules, const std::vector<RGBA_t>& stateColors, 
+	std::vector<RGBA_t>& screen, 
+	size_t pixelsPerCell, size_t WIDTH, size_t HEIGHT
+) {
+	for (size_t y = yStart; y < yEnd; ++y) {
+		for (size_t x = xStart; x < xEnd; ++x) {
+			newMap[y*cellsWidth + x] = cellMap[y*cellsWidth + x];
+			Point point {x, y};
+
+			// check if cell
+			Cell c = cellMap[y*cellsWidth + x];
+			if (c.state != 0) {
+				const Rules& local = rules[c.state];
+				// get surrounding cell outcome
+				int outcome = getSurrounding(point, cellMap, local.surrounding, cellsWidth, cellsHeight);
+
+				if (outcome < local.minToSurvive) {
+					// lower state
+					newMap[y*cellsWidth + x].state--;
+				} else if (outcome >= local.minToDie) {
+					// raise state
+					newMap[y*cellsWidth + x].state++;
+					// state too big? kill it
+					if (newMap[y*cellsWidth + x].state == rules.size()) {
+						newMap[y*cellsWidth + x].state = 0;
+					}
+				}
+			} else {
+				// no cell, check if life
+				int outcome = getSurrounding(point, cellMap, rules[0].surrounding, cellsWidth, cellsHeight);
+
+				// cells regenerate preferring higher states
+				for (size_t r = 1; r < rules.size(); ++r) {
+					if (rules[r].minForReproduction <= outcome && outcome <= rules[r].maxForReproduction) {
+						// alive!
+						newMap[y*cellsWidth + x] = Cell{r};
+					}
+				}
+			}
+
+			// calculate render
+			for (size_t py = 0; py < pixelsPerCell; ++py) {
+				for (size_t px = 0; px < pixelsPerCell; ++px) {
+					screen[(pixelsPerCell*point.y+py)*WIDTH + (pixelsPerCell*point.x+px)] = stateColors[newMap[y*cellsWidth + x].state];
+				}
+			}
+		}
+	}
 }
