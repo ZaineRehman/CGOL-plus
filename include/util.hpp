@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 
 #define __LOOP_CONCAT_INTERNAL(a, b) a ## b
@@ -18,6 +19,29 @@ std::string padString(T val, size_t size) {
 	}
 
 	return raw;
+}
+
+template<typename T, typename U>
+bool isIn(const T& item, const U& list) {
+	for (const auto& i : list) if (i == item) return true;
+	return false;
+}
+
+std::vector<std::string> splitString(const std::string& str, const std::vector<char>& delim) {
+	std::vector<std::string> splits{};
+
+	std::string built = "";
+	for (size_t i = 0; i < str.size(); ++i) {
+		if (isIn(str[i], delim)) {
+			splits.push_back(built);
+			built = "";
+		} else {
+			built += str[i];
+		}
+	}
+	splits.push_back(built);
+
+	return splits;
 }
 
 

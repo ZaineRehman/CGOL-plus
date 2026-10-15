@@ -14,8 +14,10 @@
 #include "util.hpp"
 
 
-size_t WIDTH = 800, HEIGHT = 800;
+size_t WIDTH = 1000, HEIGHT = 1000;
 double FPS = 60.0;
+
+int minRuleVal = -8, maxRuleVal = 8;
 
 size_t numThreads = 16;
 
@@ -134,7 +136,7 @@ int main() {
 		// desire to change indexed rule
 		int edit_desire = 0;
 		// mouse position
-		//float mouseX, mouseY;
+		float mouseX, mouseY;
 
 		while (SDL_PollEvent(&event)) {
 			if (event.type == SDL_EVENT_QUIT) {
@@ -142,12 +144,20 @@ int main() {
 			}
 			else if (event.type == SDL_EVENT_KEY_DOWN) {
 				switch (event.key.key) {
-					//case SDL_EVENT_MOUSE_BUTTON_DOWN:  // place cell
-					//	SDL_GetMouseState(&mouseX, &mouseY);
-					//	if (mouseX >= 0 && mouseX < WIDTH && mouseY >= 0 && mouseY < HEIGHT) {
-					//		
-					//	}
-					//	break;
+					case SDL_EVENT_MOUSE_BUTTON_DOWN:  // place cell
+						if (paused) {
+							SDL_GetMouseState(&mouseX, &mouseY);
+							if (mouseX >= 0 && mouseX < WIDTH && mouseY >= 0 && mouseY < HEIGHT) {
+								// add to both cellMap AND render
+
+								for (size_t py = 0; py < pixelsPerCell; ++py) {
+									for (size_t px = 0; px < pixelsPerCell; ++px) {
+										screen[(pixelsPerCell*mouseY+py)*WIDTH + (pixelsPerCell*mouseX+px)] = stateColors[newMap[mouseY*cellsWidth + mouseX].state];
+									}
+								}
+							}
+						}
+						break;
 
 					case SDLK_ESCAPE: 
 						RUNNING = false;
@@ -267,6 +277,9 @@ int main() {
 								if (cell.state == rules.size()) cell.state = 0;
 							}
 
+							// make sure state index isnt out of bounds
+							if (edit_stateIndex >= rules.size()) edit_stateIndex = rules.size()-1;
+
 							presentRules = true;
 						}
 
@@ -294,19 +307,19 @@ int main() {
 		if (edit_desire != 0) {
 			if (edit_ruleIndex == 0) {  // minToSurvive
 				rules[edit_stateIndex].minToSurvive += edit_desire;
-				clamp(rules[edit_stateIndex].minToSurvive, -1, 8);
+				clamp(rules[edit_stateIndex].minToSurvive, minRuleVal, maxRuleVal);
 			} else if (edit_ruleIndex == 1) {  // minToDie
 				rules[edit_stateIndex].minToDie += edit_desire;
-				clamp(rules[edit_stateIndex].minToDie, -1, 8);
+				clamp(rules[edit_stateIndex].minToDie, minRuleVal, maxRuleVal);
 			} else if (edit_ruleIndex == 2) {  // minForReproduction
 				rules[edit_stateIndex].minForReproduction += edit_desire;
-				clamp(rules[edit_stateIndex].minForReproduction, -1, 8);
+				clamp(rules[edit_stateIndex].minForReproduction, minRuleVal, maxRuleVal);
 			} else if (edit_ruleIndex == 3) {  // maxForReproduction
 				rules[edit_stateIndex].maxForReproduction += edit_desire;
-				clamp(rules[edit_stateIndex].maxForReproduction, -1, 8);
+				clamp(rules[edit_stateIndex].maxForReproduction, minRuleVal, maxRuleVal);
 			} else {  // surrounding rules
 				rules[edit_stateIndex].surrounding[edit_ruleIndex-4] += edit_desire;
-				clamp(rules[edit_stateIndex].surrounding[edit_ruleIndex-4], -1, 8);
+				clamp(rules[edit_stateIndex].surrounding[edit_ruleIndex-4], minRuleVal, maxRuleVal);
 			}
 
 			presentRules = true;
@@ -346,7 +359,7 @@ int main() {
 		const auto frameElapsed = std::chrono::steady_clock::now() - timeStart;
 		const std::chrono::duration<double> delta = frameElapsed;
 
-		if (delta.count() < 1.0/(FPS)) {
+		if (0 && delta.count() < 1.0/(FPS)) {
 			std::this_thread::sleep_for(std::chrono::duration<double>(1.0/(FPS) - delta.count()));
 		}
 	}

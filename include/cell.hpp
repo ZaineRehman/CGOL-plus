@@ -3,6 +3,7 @@
 #include <iostream>
 #include <unordered_map>
 #include <vector>
+#include <fstream>
 
 
 struct Point {
@@ -107,7 +108,7 @@ void doCellCalc(
 	for (size_t y = yStart; y < yEnd; ++y) {
 		for (size_t x = xStart; x < xEnd; ++x) {
 			newMap[y*cellsWidth + x] = cellMap[y*cellsWidth + x];
-			Point point {x, y};
+			const Point point {x, y};
 
 			// check if cell
 			Cell c = cellMap[y*cellsWidth + x];
@@ -143,9 +144,24 @@ void doCellCalc(
 			// calculate render
 			for (size_t py = 0; py < pixelsPerCell; ++py) {
 				for (size_t px = 0; px < pixelsPerCell; ++px) {
-					screen[(pixelsPerCell*point.y+py)*WIDTH + (pixelsPerCell*point.x+px)] = stateColors[newMap[y*cellsWidth + x].state];
+					screen[(pixelsPerCell*y+py)*WIDTH + (pixelsPerCell*x+px)] = stateColors[newMap[y*cellsWidth + x].state];
 				}
 			}
 		}
+	}
+}
+
+
+void readFileIntoRules(std::vector<Rules>& rules, const std::string& path) {
+	/*
+	 * -1,-1,-1,-1 ~ 0,1,1 _   0,  0,  0
+	 *  2, 5, 4, 4 ~ 0,2,0 _ 255,  0,  0
+	 *  4, 5, 3, 3 ~ 0,1,1 _ 255,255,255
+	**/
+
+	std::ifstream file(path);
+
+	for (std::string line; std::getline(file, line);) {
+
 	}
 }
