@@ -41,9 +41,9 @@ int main() {
 					  newMap (cellsWidth*cellsHeight, Cell{0});
 
 	std::vector<Rules> rules {
-		Rules{-1, -1, -1, -1, {0, 0, 1}}, 
-		Rules{ 2,  3, -1, -1, {0, 1, 2}}, 
-		Rules{ 2,  5,  4,  4, {0, 0, 1}}, 
+		Rules{-1, -1, -1, -1, 0, {0, 0, 1}}, 
+		Rules{ 2,  3, -1, -1, 0, {0, 1, 2}}, 
+		Rules{ 2,  5,  4,  4, 0, {0, 0, 1}}, 
 		//Rules{ 2,  4,  3, 3, {1, 1, 1}},  // STANDARD
 	};
 	std::vector<RGBA_t> stateColors {
@@ -101,10 +101,11 @@ int main() {
 					<< getPresentColor(ri, 0) << padString(rules[ri].minToSurvive, 2) << ansi_reset << ","
 					<< getPresentColor(ri, 1) << padString(rules[ri].minToDie, 2) << ansi_reset << " ~ "
 					<< getPresentColor(ri, 2) << padString(rules[ri].minForReproduction, 2) << ansi_reset << ","
-					<< getPresentColor(ri, 3) << padString(rules[ri].maxForReproduction, 2) << ansi_reset << " {";
+					<< getPresentColor(ri, 3) << padString(rules[ri].maxForReproduction, 2) << ansi_reset << " ~ "
+					<< getPresentColor(ri, 4) << padString(rules[ri].outOfBounds, 2) << ansi_reset << " {";
 				for (size_t si = 0; si < rules[ri].surrounding.size(); ++si) {
 					std::cout 
-						<< getPresentColor(ri, 4 + si) 
+						<< getPresentColor(ri, 5 + si) 
 						<< padString(rules[ri].surrounding[si], 2) 
 						<< ansi_reset << (si == rules[ri].surrounding.size()-1 ? "}  [": ",");
 				}
@@ -172,11 +173,11 @@ int main() {
 						presentRules = true;
 						break;
 					case SDLK_LEFT: 
-						clamp_rollover(--edit_ruleIndex, 0, static_cast<int>(rules.size()+3));
+						clamp_rollover(--edit_ruleIndex, 0, static_cast<int>(rules.size()+4));
 						presentRules = true;
 						break;
 					case SDLK_RIGHT: 
-						clamp_rollover(++edit_ruleIndex, 0, static_cast<int>(rules.size()+3));
+						clamp_rollover(++edit_ruleIndex, 0, static_cast<int>(rules.size()+4));
 						presentRules = true;
 						break;
 					
@@ -286,7 +287,7 @@ int main() {
 						break;
 					
 					case SDLK_RETURN:  // add topmost state
-						Rules defaultRuleset {2, 4, 3, 3, {0}};
+						Rules defaultRuleset {2, 4, 3, 3, 0, {0}};
 						LOOP(rules.size()-1) defaultRuleset.surrounding.push_back(1);
 
 						rules.push_back(defaultRuleset);
@@ -317,9 +318,12 @@ int main() {
 			} else if (edit_ruleIndex == 3) {  // maxForReproduction
 				rules[edit_stateIndex].maxForReproduction += edit_desire;
 				clamp(rules[edit_stateIndex].maxForReproduction, minRuleVal, maxRuleVal);
+			} else if (edit_ruleIndex == 4) {  // outOfBounds
+				rules[edit_stateIndex].outOfBounds += edit_desire;
+				clamp(rules[edit_stateIndex].outOfBounds, minRuleVal, maxRuleVal);
 			} else {  // surrounding rules
-				rules[edit_stateIndex].surrounding[edit_ruleIndex-4] += edit_desire;
-				clamp(rules[edit_stateIndex].surrounding[edit_ruleIndex-4], minRuleVal, maxRuleVal);
+				rules[edit_stateIndex].surrounding[edit_ruleIndex-5] += edit_desire;
+				clamp(rules[edit_stateIndex].surrounding[edit_ruleIndex-5], minRuleVal, maxRuleVal);
 			}
 
 			presentRules = true;

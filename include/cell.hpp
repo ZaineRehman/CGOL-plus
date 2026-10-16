@@ -61,18 +61,20 @@ struct Rules {
 	int minForReproduction;
 	// max amount of surrounding for reproduction
 	int maxForReproduction;
+	// value taken from out of bounds areas
+	int outOfBounds;
 	// surrounding values taken from each cell state
 	// index 0 = for empty cells, index 1 = state 1, etc. 
 	std::vector<int> surrounding;
 
 	Rules() = default;
-	Rules(int _minToSurvive, int _minToDie, int _minForReproduction, int _maxForReproduction, const std::vector<int>& _surrounding) 
-		: minToSurvive(_minToSurvive), minToDie(_minToDie), minForReproduction(_minForReproduction), maxForReproduction(_maxForReproduction), surrounding(_surrounding) {}
+	Rules(int _minToSurvive, int _minToDie, int _minForReproduction, int _maxForReproduction, int _outOfBounds, const std::vector<int>& _surrounding) 
+		: minToSurvive(_minToSurvive), minToDie(_minToDie), minForReproduction(_minForReproduction), maxForReproduction(_maxForReproduction), outOfBounds(_outOfBounds), surrounding(_surrounding) {}
 	Rules(const Rules& other) = default;
 };
 
 // returns the number of surrounding cells
-int getSurrounding(const Point& point, const std::vector<Cell>& cells, const std::vector<int>& surroundingRules, size_t WIDTH, size_t HEIGHT) {
+int getSurrounding(const Point& point, const std::vector<Cell>& cells, const Rules& rules, size_t WIDTH, size_t HEIGHT) {
 	int total = 0;
 
 	static const Point toCheck[] = {
@@ -87,7 +89,10 @@ int getSurrounding(const Point& point, const std::vector<Cell>& cells, const std
 
 		if (newX >= 0 && newX < static_cast<int>(WIDTH) && newY >= 0 && newY < static_cast<int>(HEIGHT)) {
 			int cstate = cells[newY*static_cast<int>(WIDTH) + newX].state;
-			total += surroundingRules[cstate];
+			total += rules.surrounding[cstate];
+		} else {
+			// out of bounds
+			total += rules.outOfBounds;
 		}
 	}
 
@@ -115,7 +120,7 @@ void doCellCalc(
 			if (c.state != 0) {
 				const Rules& local = rules[c.state];
 				// get surrounding cell outcome
-				int outcome = getSurrounding(point, cellMap, local.surrounding, cellsWidth, cellsHeight);
+				int outcome = getSurrounding(point, cellMap, local, cellsWidth, cellsHeight);
 
 				if (outcome < local.minToSurvive) {
 					// lower state
@@ -130,7 +135,7 @@ void doCellCalc(
 				}
 			} else {
 				// no cell, check if life
-				int outcome = getSurrounding(point, cellMap, rules[0].surrounding, cellsWidth, cellsHeight);
+				int outcome = getSurrounding(point, cellMap, rules[0], cellsWidth, cellsHeight);
 
 				// cells regenerate preferring higher states
 				for (size_t r = 1; r < rules.size(); ++r) {
